@@ -203,7 +203,7 @@ struct MSF_SensorManagerROS : public msf_core::MSF_SensorManager<EKFState_T> {
       geometry_msgs::PoseWithCovarianceStamped msgPose;
       msgPose.header.stamp = ros::Time(state->time);
       msgPose.header.seq = msg_seq++;
-      msgPose.header.frame_id = "/world";
+      msgPose.header.frame_id = config_.world_frame_name;
       state->ToPoseMsg(msgPose);
       pubPose_.publish(msgPose);
 
@@ -211,8 +211,8 @@ struct MSF_SensorManagerROS : public msf_core::MSF_SensorManager<EKFState_T> {
       nav_msgs::Odometry msgOdometry;
       msgOdometry.header.stamp = ros::Time(state->time);
       msgOdometry.header.seq = msg_seq++;
-      msgOdometry.header.frame_id = "/world";
-      msgOdometry.child_frame_id = "imu";
+      msgOdometry.header.frame_id = config_.world_frame_name;
+      msgOdometry.child_frame_id = config_.imu_frame_name;
       state->ToOdometryMsg(msgOdometry);
       pubOdometry_.publish(msgOdometry);
 
@@ -323,7 +323,7 @@ struct MSF_SensorManagerROS : public msf_core::MSF_SensorManager<EKFState_T> {
       geometry_msgs::PoseWithCovarianceStamped msgPose;
       msgPose.header.stamp = ros::Time(state->time);
       msgPose.header.seq = msg_seq;
-      msgPose.header.frame_id = "/world";
+      msgPose.header.frame_id = config_.world_frame_name;
 
       state->ToPoseMsg(msgPose);
       pubPoseAfterUpdate_.publish(msgPose);
