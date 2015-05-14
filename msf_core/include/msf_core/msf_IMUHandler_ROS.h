@@ -27,11 +27,15 @@ class IMUHandler_ROS : public IMUHandler<EKFState_T> {
   ros::Subscriber subImu_;  ///< subscriber to IMU readings
   ros::Subscriber subImuCustom_;  ///< subscriber to IMU readings for asctec custom
 
+  bool accel_units_g_;
  public:
   IMUHandler_ROS(MSF_SensorManager<EKFState_T>& mng,
                  const std::string& topic_namespace,
-                 const std::string& parameternamespace)
-      : IMUHandler<EKFState_T>(mng, topic_namespace, parameternamespace) {
+                 const std::string& parameternamespace,
+                 bool accel_units_g=false)
+      : IMUHandler<EKFState_T>(mng, topic_namespace, parameternamespace),
+  accel_units_g_(accel_units_g)
+    {
 
     ros::NodeHandle nh(topic_namespace);
 
@@ -116,6 +120,8 @@ class IMUHandler_ROS : public IMUHandler<EKFState_T> {
     msf_core::Vector3 linacc;
     linacc << msg->linear_acceleration.x, msg->linear_acceleration.y, msg
         ->linear_acceleration.z;
+    if(accel_units_g_)
+        linacc *= fabs(msf_core::constants::GRAVITY(2));
 
     msf_core::Vector3 angvel;
     angvel << msg->angular_velocity.x, msg->angular_velocity.y, msg

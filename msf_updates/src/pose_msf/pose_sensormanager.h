@@ -52,7 +52,7 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
 
     imu_handler_.reset(
         new msf_core::IMUHandler_ROS<msf_updates::EKFState>(*this, "msf_core",
-                                                            "imu_handler"));
+                                                            "imu_handler", true));
     pose_handler_.reset(
         new PoseSensorHandler_T(*this, "", "pose_sensor", distortmeas));
 
