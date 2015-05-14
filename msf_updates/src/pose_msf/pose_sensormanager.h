@@ -164,8 +164,8 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
     v << 0, 0, 0;			/// Robot velocity (IMU centered).
     w_m << 0, 0, 0;		/// Initial angular velocity.
 
-    q_wv.setIdentity();  // Vision-world rotation drift.
-    p_wv.setZero();  // Vision-world position drift.
+    p.setZero(); // initial position
+    q.setIdentity(); // initial orientation
 
     P.setZero();  // Error state covariance; if zero, a default initialization in msf_core is used
 
@@ -184,6 +184,16 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
           "No measurements received yet to initialize attitude - using [1 0 0 0]");
 
     ros::NodeHandle pnh("~");
+    pnh.param("pose_sensor/init/p/x", p[0], 0.0);
+    pnh.param("pose_sensor/init/p/y", p[1], 0.0);
+    pnh.param("pose_sensor/init/p/z", p[2], 0.0);
+
+    pnh.param("pose_sensor/init/q/w", q.w(), 1.0);
+    pnh.param("pose_sensor/init/q/x", q.x(), 0.0);
+    pnh.param("pose_sensor/init/q/y", q.y(), 0.0);
+    pnh.param("pose_sensor/init/q/z", q.z(), 0.0);
+    q.normalize();
+
     pnh.param("pose_sensor/init/p_ic/x", p_ic[0], 0.0);
     pnh.param("pose_sensor/init/p_ic/y", p_ic[1], 0.0);
     pnh.param("pose_sensor/init/p_ic/z", p_ic[2], 0.0);
@@ -194,16 +204,9 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
     pnh.param("pose_sensor/init/q_ic/z", q_ic.z(), 0.0);
     q_ic.normalize();
 
-    // Calculate initial attitude and position based on sensor measurements.
-    if (q_cv.w() == 1) {  // If there is no pose measurement, only apply q_wv.
-      q = q_wv;
-    } else {  // If there is a pose measurement, apply q_ic and q_wv to get initial attitude.
-      q = (q_ic * q_cv.conjugate() * q_wv).conjugate();
-    }
+    q_wv = q_cv * q_ic.conjugate() * q.conjugate();
 
-    q.normalize();
-    p = p_wv + q_wv.conjugate().toRotationMatrix() * p_vc / scale
-        - q.toRotationMatrix() * p_ic;
+    p_wv = p - q_wv.toRotationMatrix()*p_vc/scale + q * p_ic;
 
     a_m = q.inverse() * g;			/// Initial acceleration.
 
