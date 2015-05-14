@@ -157,7 +157,7 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
     msf_core::MSF_Core<EKFState_T>::ErrorStateCov P;
 
     // init values
-    g << 0, 0, 9.81;	        /// Gravity.
+    g = msf_core::constants::GRAVITY;	        /// Gravity.
     b_w << 0, 0, 0;		/// Bias gyroscopes.
     b_a << 0, 0, 0;		/// Bias accelerometer.
 
