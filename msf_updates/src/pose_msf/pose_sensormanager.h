@@ -206,7 +206,8 @@ class PoseSensorManager : public msf_core::MSF_SensorManagerROS<
 
     q_wv = q_cv * q_ic.conjugate() * q.conjugate();
 
-    p_wv = p - q_wv.toRotationMatrix()*p_vc/scale + q * p_ic;
+    p_wv = p - q_wv.conjugate().toRotationMatrix() * p_vc / scale
+           + q.toRotationMatrix() * p_ic;
 
     a_m = q.inverse() * g;			/// Initial acceleration.
 
