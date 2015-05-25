@@ -19,7 +19,6 @@
 #define TESTING_PREDICATES_H_
 
 #include <gtest/gtest.h>
-#include <glog/logging.h>
 
 #define __INTERNAL_GTEST_NEAR_EIGEN(PREDICATE, matrix_A, matrix_B, precision) \
   PREDICATE##_TRUE((matrix_A).isApprox((matrix_B), precision)) \
