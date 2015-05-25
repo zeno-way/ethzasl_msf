@@ -22,7 +22,6 @@
 #include <msf_core/msf_tmp.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-#include <glog/logging.h>
 #include <vector>
 #include <msf_core/eigen_conversions.h>
 #include <nav_msgs/Odometry.h>
@@ -30,6 +29,10 @@
 #include <sensor_fusion_comm/DoubleArrayStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <boost/lexical_cast.hpp>
+
+#define CHECK_EQ(val1, val2)                         \
+  if ( (val1) != (val2) )               \
+    MSF_ERROR_STREAM(__FILE__ << " " << __LINE__ << " CHECK_EQ fail")
 
 namespace msf_core {
 

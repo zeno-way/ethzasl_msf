@@ -11,7 +11,7 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/)
 
-find_package(catkin REQUIRED COMPONENTS sensor_msgs dynamic_reconfigure msf_timing tf glog_catkin cmake_modules)
+find_package(catkin REQUIRED COMPONENTS sensor_msgs dynamic_reconfigure msf_timing tf cmake_modules)
 find_package(Eigen REQUIRED)
 
 find_package(Doxygen)
@@ -39,8 +39,8 @@ add_definitions (-DENABLE_MSF_TIMING)
 generate_dynamic_reconfigure_options(cfg/MSF_Core.cfg)
 
 catkin_package(
-    DEPENDS eigen glog_catkin
-    CATKIN_DEPENDS roscpp sensor_msgs nav_msgs dynamic_reconfigure msf_timing tf glog_catkin
+    DEPENDS eigen
+    CATKIN_DEPENDS roscpp sensor_msgs nav_msgs dynamic_reconfigure msf_timing tf
     INCLUDE_DIRS include ${Eigen_INCLUDE_DIRS}
     LIBRARIES msf_core similaritytransform
     CFG_EXTRAS export_flags.cmake

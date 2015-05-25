@@ -19,7 +19,6 @@
 #define TESTING_ENTRYPOINT_H_
 
 #include <gtest/gtest.h>
-#include <glog/logging.h>
 
 // Let the Eclipse parser see the macro.
 #ifndef TEST
@@ -29,7 +28,6 @@
 #define MSF_UNITTEST_ENTRYPOINT\
   int main(int argc, char** argv) {\
  ::testing::InitGoogleTest(&argc, argv);\
-  google::InitGoogleLogging(argv[0]);\
   return RUN_ALL_TESTS();\
 }
 
