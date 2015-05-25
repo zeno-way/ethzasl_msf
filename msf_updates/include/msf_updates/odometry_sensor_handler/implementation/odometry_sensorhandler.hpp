@@ -98,6 +98,15 @@ void OdometrySensorHandler<MEASUREMENT_TYPE, MANAGER_TYPE>::ProcessOdometryMeasu
     if (mngr->Getcfg().odometry_fixed_p_ib) {
       fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::p_ib;
     }
+    if (mngr->Getcfg().odometry_fixed_q_ib) {
+      fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::q_ib;
+    }
+    if (mngr->Getcfg().odometry_fixed_p_d) {
+      fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::p_d;
+    }
+    if (mngr->Getcfg().odometry_fixed_yaw_d) {
+      fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::yaw_d;
+    }
   }
 
   shared_ptr < MEASUREMENT_TYPE

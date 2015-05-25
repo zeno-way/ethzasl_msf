@@ -165,10 +165,10 @@ namespace msf_updates {
                         kIdxstartcorr_q = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
                         StateDefinition_T::q>::value,
 
-                        kIdxstartcorr_qwo = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
-                        StateDefinition_T::q_wo>::value,
-                        kIdxstartcorr_pwo = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
-                        StateDefinition_T::p_wo>::value,
+                        kIdxstartcorr_yawd = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
+                        StateDefinition_T::yaw_d>::value,
+                        kIdxstartcorr_pd = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
+                        StateDefinition_T::p_d>::value,
                         kIdxstartcorr_qib = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
                         StateDefinition_T::q_ib>::value,
                         kIdxstartcorr_pib = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
@@ -178,18 +178,18 @@ namespace msf_updates {
                     // Read the fixed states flags.
                     bool calibposfix = (fixedstates_ & 1 << StateDefinition_T::p_ib);
                     bool calibattfix = (fixedstates_ & 1 << StateDefinition_T::q_ib);
-                    bool driftwoattfix = (fixedstates_ & 1 << StateDefinition_T::q_wo);
-                    bool driftwoposfix = (fixedstates_ & 1 << StateDefinition_T::p_wo);
+                    bool driftdattfix = (fixedstates_ & 1 << StateDefinition_T::yaw_d);
+                    bool driftdposfix = (fixedstates_ & 1 << StateDefinition_T::p_d);
 
                     // Set crosscov to zero for fixed states.
                     if (calibposfix)
                         state_in->ClearCrossCov<StateDefinition_T::p_ib>();
                     if (calibattfix)
                         state_in->ClearCrossCov<StateDefinition_T::q_ib>();
-                    if (driftwoattfix)
-                        state_in->ClearCrossCov<StateDefinition_T::q_wo>();
-                    if (driftwoposfix)
-                        state_in->ClearCrossCov<StateDefinition_T::p_wo>();
+                    if (driftdattfix)
+                        state_in->ClearCrossCov<StateDefinition_T::yaw_d>();
+                    if (driftdposfix)
+                        state_in->ClearCrossCov<StateDefinition_T::p_d>();
 
                     // Construct H matrix.
                     // Position:

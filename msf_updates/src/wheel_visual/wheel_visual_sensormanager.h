@@ -286,10 +286,10 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
         config_.pose_noise_p_ic);
     const msf_core::Vector1 n_L = msf_core::Vector1::Constant(
         config_.pose_noise_scale);
-    const msf_core::Vector3 nqwov = msf_core::Vector3::Constant(
-        config_.odometry_noise_q_wo);
-    const msf_core::Vector3 npwov = msf_core::Vector3::Constant(
-        config_.odometry_noise_p_wo);
+    const msf_core::Vector1 nyawdv = msf_core::Vector1::Constant(
+        config_.odometry_noise_yaw_d);
+    const msf_core::Vector2 npdv = msf_core::Vector2::Constant(
+        config_.odometry_noise_p_d);
     const msf_core::Vector3 nqibv = msf_core::Vector3::Constant(
         config_.odometry_noise_q_ib);
     const msf_core::Vector3 npibv = msf_core::Vector3::Constant(
