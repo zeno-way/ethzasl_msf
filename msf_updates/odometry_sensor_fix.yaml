@@ -51,7 +51,7 @@ pose_sensor/pose_measurement_world_sensor: true  # Selects if sensor measures it
                                                   # sensor (false, e.g. ethzasl_ptam).
 wheel_visual_sensor/pose_delay: 0.00                      # [s] delay of pose sensor w.r.t. imu
 
-odometry_sensor/odometry_absolute_measurements: true
+odometry_sensor/odometry_absolute_measurements: false
 odometry_sensor/odometry_measurement_world_sensor: true
 
 # For the pose sensor noise levels use the std deviation the units are
