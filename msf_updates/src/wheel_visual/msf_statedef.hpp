@@ -27,20 +27,20 @@ namespace msf_updates {
  * of sensors / states to estimate.
  */
 enum StateDefinition {  //must not manually set the enum values!
-  p,
-  v,
-  q,
-  b_w,
-  b_a,
-  L,
-  q_wv,
-  p_wv,
-  q_ic,
-  p_ic,
-  q_wo,
-  p_wo,
-  q_ib,
-  p_ib,
+  p,                    // position of imu in world coordinates
+  v,                    // velocity of imu in world coordinates
+  q,                    // rotate a vector in imu coordinates to world coordinates
+  b_w,                  // gyro bias in imu coordinates
+  b_a,                  // accel bias in imu coordinates
+  L,                    // visual scale factor
+  q_wv,                 // rotate a vector in vision frame to world frame
+  p_wv,                 // position of vision frame in world cooridnates
+  q_ic,                 // rotate a vector in camera frame to imu coordinates
+  p_ic,                 // position of camera in imu cooridnates (backwards)
+  yaw_d,                // yaw from world frame to odometry frame in odometry frame
+  p_d,                 // position of world frame origin in odometry frame
+  q_ib,                 // rotate vector in base link to imu
+  p_ib,                 // position of base link in imu coordinates
 };
 
 namespace {
@@ -69,9 +69,9 @@ typedef boost::fusion::vector<
     msf_core::StateVar_T<Eigen::Quaternion<double>, q_ic>,  ///< Rotation from the IMU frame to the camera frame expressed in the IMU frame.
     msf_core::StateVar_T<Eigen::Matrix<double, 3, 1>, p_ic>,  ///< Translation from the IMU frame to the camera frame expressed in the IMU frame.
 
-    msf_core::StateVar_T<Eigen::Quaternion<double>, q_wo,  ///< Rotation from the world frame to the frame in which the wheel odometry is measured expressed in the world frame.
+    msf_core::StateVar_T<Eigen::Matrix<double, 1, 1>, yaw_d,  ///< Rotation from the world frame to the frame in which the wheel odometry is measured expressed in the world frame.
         msf_core::AuxiliaryNonTemporalDrifting>,  ///< Translation from the world frame to the frame in which the wheel odometry is measured expressed in the world frame.
-    msf_core::StateVar_T<Eigen::Matrix<double, 3, 1>, p_wo>,  ///< wheel odometry position drift.
+    msf_core::StateVar_T<Eigen::Matrix<double, 2, 1>, p_d>,  ///< wheel odometry position drift.
     msf_core::StateVar_T<Eigen::Quaternion<double>, q_ib>,  ///< Rotation from the IMU frame to the base link frame expressed in the IMU frame.
     msf_core::StateVar_T<Eigen::Matrix<double, 3, 1>, p_ib> ///< Translation from the IMU frame to the base link frame expressed in the IMU frame.
 > fullState_T;

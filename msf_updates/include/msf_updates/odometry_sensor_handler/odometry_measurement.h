@@ -128,33 +128,39 @@ namespace msf_updates {
 
                     H.setZero();
 
-                    // Get rotation matrices.
-                    Eigen::Matrix<double, 3, 3> C_wo = state.Get<StateDefinition_T::q_wo>()
-                        .toRotationMatrix();
-                    Eigen::Matrix<double, 3, 3> C_q = state.Get<StateDefinition_T::q>()
-                        .toRotationMatrix();
+                    Eigen::Matrix<double, 3, 1> p_iw = state.Get<StateDefinition_T::p>();
 
-                    Eigen::Matrix<double, 3, 3> C_bi = state.Get<StateDefinition_T::q_ib>()
-                        .conjugate().toRotationMatrix();
+                    Eigen::Matrix<double, 3, 1> v_iw = state.Get<StateDefinition_T::v>();
 
-                    // Preprocess for elements in H matrix.
-                    Eigen::Matrix<double, 3, 1> vecold;
+                    Eigen::Quaterniond q_iw = state.Get<StateDefinition_T::q>();
+                    Eigen::Matrix<double, 3, 3> C_iw = q_iw.toRotationMatrix();
 
-                    vecold = (-state.Get<StateDefinition_T::p_wo>() + state.Get<StateDefinition_T::p>()
-                            + C_q * state.Get<StateDefinition_T::p_ib>());
-                    Eigen::Matrix<double, 3, 3> skewold = Skew(vecold);
+                    Eigen::Matrix<double, 3, 1> p_ib = state.Get<StateDefinition_T::p_ib>();
 
-                    Eigen::Matrix<double, 3, 1> pbi =
-                        state.Get<StateDefinition_T::p_ib>();
+                    Eigen::Quaterniond q_ib = state.Get<StateDefinition_T::q_ib>();
+                    Eigen::Matrix<double, 3, 3> C_ib = q_ib.toRotationMatrix();
+                    Eigen::Matrix<double, 3, 3> C_bi = C_ib.transpose();
 
-                    Eigen::Matrix<double, 3, 3> pbi_sk = Skew(pbi);
+                    double yaw_d = state.Get<StateDefinition_T::yaw_d>()(0);
+                    Eigen::Quaterniond q_d = Eigen::Quaterniond(sqrt(1.0-yaw_d*yaw_d/4.0), 0, 0, yaw_d/2.0);
+                    Eigen::Matrix<double, 3, 3> C_d = q_d.toRotationMatrix();
+
+                    Eigen::Matrix<double, 2, 1> p_d = state.Get<StateDefinition_T::p_d>();
 
                     Eigen::Matrix<double, 3, 3> omega_sk = Skew(state.w_m);
 
-                    Eigen::Matrix<double, 3, 1> viw = 
-                            state.Get<StateDefinition_T::v>();
+                    // decompose to yaw about z
+                    Eigen::Quaterniond q_bw = q_iw*q_ib;
+                    Eigen::Quaterniond q_bw_y = Eigen::Quaterniond(q_bw.w(), 0, 0, q_bw.z()).normalized();
+                    Eigen::Matrix<double, 3, 3> C_bw_y = q_bw_y.toRotationMatrix();
+                    // and pitch/roll about vector in xy plane
+                    Eigen::Quaterniond q_bw_pr = q_bw*q_bw_y.conjugate();
 
-                    //Eigen::Matrix<double, 3, 3> viw_sk = Skew(viw);
+                    // construct odometry->world rotation
+                    Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
+                    Eigen::Matrix<double, 3, 3> C_wo = q_wo.toRotationMatrix();
+                    // C_wo = C_d.transpose()*C_bw_y*C_bi*C_iw.transpose()
+
 
                     // Get indices of states in error vector.
                     enum {
@@ -195,58 +201,142 @@ namespace msf_updates {
                     // Position:
                     H.block<2, 3>(0, kIdxstartcorr_p) = C_wo.block<2,3>(0,0);  // p
 
-                    H.block<2, 3>(0, kIdxstartcorr_q) = (-C_wo * C_q * pbi_sk).block<2,3>(0,0);  // q
+                    auto position = [&q_iw, &q_ib, &p_ib, &p_iw, &q_d, &p_d] (
+                            Eigen::Quaterniond dq_iw=Eigen::Quaterniond::Identity(),
+                            Eigen::Quaterniond dq_ib=Eigen::Quaterniond::Identity())
+                        -> Eigen::Matrix<double, 2,1>
+                    {
+                        Eigen::Quaterniond q_bw = dq_iw*q_iw*dq_ib*q_ib;
+                        Eigen::Quaterniond q_bw_y = Eigen::Quaterniond(q_bw.w(), 0, 0, q_bw.z()).normalized();
+                        // and pitch/roll about vector in xy plane
+                        Eigen::Quaterniond q_bw_pr = q_bw*q_bw_y.conjugate();
+                        // construct odometry->world rotation
+                        Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
+
+                        return ((q_wo*(p_iw + dq_iw*q_iw*p_ib)).block<2,1>(0,0) + p_d);
+                    };
+                    double eps = 0.001;
+                    Eigen::Quaterniond dq_iw;
+                    dq_iw.setIdentity();
+                    dq_iw.x() = eps/2.;
+                    H.block<2,1>(0, kIdxstartcorr_q) = (position(dq_iw)-position())/eps;
+                    dq_iw.setIdentity();
+                    dq_iw.y() = eps/2.;
+                    H.block<2,1>(0, kIdxstartcorr_q+1) = (position(dq_iw)-position())/eps;
+                    dq_iw.setIdentity();
+                    dq_iw.z() = eps/2.;
+                    H.block<2,1>(0, kIdxstartcorr_q+2) = (position(dq_iw)-position())/eps;
 
                     H.block<2, 3>(0, kIdxstartcorr_pib) =
                         calibposfix ?
                         Eigen::Matrix<double, 2, 3>::Zero() :
-                        (C_wo * C_q).block<2,3>(0,0).eval();  //p_ib
+                        (C_d.transpose()*C_bw_y*C_ib.transpose()).block<2,3>(0,0).eval();  //p_ib
 
-                    H.block<2, 3>(0, kIdxstartcorr_pwo) =
-                        driftwoposfix ?
-                        Eigen::Matrix<double, 2, 3>::Zero() :
-                        (-Eigen::Matrix<double, 3, 3>::Identity()).block<2,3>(0,0).eval();  //p_wo
+                    if(calibattfix)
+                    {
+                        H.block<2, 3>(0, kIdxstartcorr_qib) =  Eigen::Matrix<double, 2, 3>::Zero();  // q_ib
+                    }
+                    else
+                    {
+                        Eigen::Quaterniond dq_ib;
+                        dq_ib.setIdentity();
+                        dq_ib.x() = eps/2.;
+                        H.block<2,1>(0, kIdxstartcorr_qib) = (position(Eigen::Quaterniond::Identity(), dq_ib)-position())/eps;
+                        dq_ib.setIdentity();
+                        dq_ib.y() = eps/2.;
+                        H.block<2,1>(0, kIdxstartcorr_qib+1) = (position(Eigen::Quaterniond::Identity(), dq_ib)-position())/eps;
+                        dq_ib.setIdentity();
+                        dq_ib.z() = eps/2.;
+                        H.block<2,1>(0, kIdxstartcorr_qib+2) = (position(Eigen::Quaterniond::Identity(), dq_ib)-position())/eps;
+                    }
 
-                    H.block<2, 3>(0, kIdxstartcorr_qwo) =
-                        driftwoattfix ?
-                        Eigen::Matrix<double, 2, 3>::Zero() :
-                        (-C_wo * skewold).block<2,3>(0,0).eval();  // q_wo
+                    H.block<2, 2>(0, kIdxstartcorr_pd) =
+                        driftdposfix ?
+                        (Eigen::Matrix<double, 2, 2>::Zero().eval()):
+                        (Eigen::Matrix<double, 3, 3>::Identity().block<2, 2>(0,0).eval());  //p_d
+
+                    H.block<2, 1>(0, kIdxstartcorr_yawd) =
+                        driftdattfix ?
+                        Eigen::Matrix<double, 2, 1>::Zero() :
+                        (-C_d.transpose()*Skew(C_bw_y*C_bi*(C_iw.transpose()*p_iw+p_ib))).block<2,1>(0,2).eval();  // yaw_d
 
                     // Yaw.
-                    H.block<1, 3>(2, kIdxstartcorr_q) = C_bi.block<1,3>(2,0);  // q
 
-                    H.block<1, 3>(2, kIdxstartcorr_qwo) =
-                        driftwoattfix ?
-                        Eigen::Matrix<double, 1, 3>::Zero() :
-                        (C_bi * C_q.transpose()).block<1,3>(2,0).eval();  // q_wo
+                    auto orientation = [&q_iw, &q_ib, &q_d] (
+                            Eigen::Quaterniond dq_iw=Eigen::Quaterniond::Identity(),
+                            Eigen::Quaterniond dq_ib=Eigen::Quaterniond::Identity())
+                        ->Eigen::Quaterniond
+                    {
+                        Eigen::Quaterniond q_bw = dq_iw*q_iw*dq_ib*q_ib;
+                        Eigen::Quaterniond q_bw_y = Eigen::Quaterniond(q_bw.w(), 0, 0, q_bw.z()).normalized();
+                        // and pitch/roll about vector in xy plane
+                        Eigen::Quaterniond q_bw_pr = q_bw*q_bw_y.conjugate();
+                        // construct odometry->world rotation
+                        Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
 
-                    H.block<1, 3>(2, kIdxstartcorr_qib) =
-                        calibattfix ?
+                        return q_wo*dq_iw*q_iw*dq_ib*q_ib;
+                    };
+                    dq_iw.setIdentity();
+                    dq_iw.x() = eps/2.;
+                    H(2, kIdxstartcorr_q) = (orientation(dq_iw).conjugate()*orientation()).z()/eps*2;
+                    dq_iw.setIdentity();
+                    dq_iw.y() = eps/2.;
+                    H(2, kIdxstartcorr_q+1) = (orientation(dq_iw).conjugate()*orientation()).z()/eps*2;
+                    dq_iw.setIdentity();
+                    dq_iw.z() = eps/2;
+                    H(2, kIdxstartcorr_q+2) = (orientation(dq_iw).conjugate()*orientation()).z()/eps*2;
+
+                    H.block<1, 3>(2, kIdxstartcorr_yawd) =
+                        driftdattfix ?
                         Eigen::Matrix<double, 1, 3>::Zero() :
-                        Eigen::Matrix<double, 1, 3>::UnitZ().eval();  //q_ib
+                        (-Eigen::Matrix<double, 3, 3>::Identity()).block<1,3>(2,0).eval();  // yaw_d
+
+                    if(calibattfix)
+                    {
+                        H.block<1, 3>(2, kIdxstartcorr_qib) = Eigen::Matrix<double, 1, 3>::Zero();
+                    }
+                    else
+                    {
+                        Eigen::Quaterniond dq_ib;
+                        dq_ib.setIdentity();
+                        dq_ib.x() = eps/2.;
+                        H(2, kIdxstartcorr_qib) =  (orientation(Eigen::Quaterniond::Identity(), dq_ib).conjugate()*orientation()).z()/eps*2;
+                        dq_ib.setIdentity();
+                        dq_ib.y() = eps/2.;
+                        H(2, kIdxstartcorr_qib+1) =  (orientation(Eigen::Quaterniond::Identity(), dq_ib).conjugate()*orientation()).z()/eps*2;
+                        dq_ib.setIdentity();
+                        dq_ib.z() = eps/2.;
+                        H(2, kIdxstartcorr_qib+2) =  (orientation(Eigen::Quaterniond::Identity(), dq_ib).conjugate()*orientation()).z()/eps*2;
+                    }
 
                     // Velocity
-                    H.block<2, 3>(3, kIdxstartcorr_v) =  (C_bi * C_q).block<2,3>(0,0);  // v
+                    H.block<2, 3>(3, kIdxstartcorr_v) = (C_bi * C_iw.transpose()).block<2,3>(0,0);  // v
 
                     H.block<2, 3>(3, kIdxstartcorr_q) =
-                        (C_bi*Skew(C_q * viw)).block<2,3>(0,0);  // q
+                        (-C_bi*Skew(C_iw.transpose() * v_iw)).block<2,3>(0,0);  // q
 
                     H.block<2, 3>(3, kIdxstartcorr_pib) = 
                         calibposfix ?
                         Eigen::Matrix<double, 2, 3>::Zero() : 
-                        Skew(C_bi * C_q * viw).block<2,3>(0,0).eval(); // p_ib
+                        (C_bi * omega_sk).block<2,3>(0,0).eval(); // p_ib
 
                     H.block<2, 3>(3, kIdxstartcorr_qib) = 
                         calibattfix ?
                         Eigen::Matrix<double, 2, 3>::Zero() : 
-                        (C_bi * omega_sk + Skew(C_bi * omega_sk * pbi)).block<2,3>(0,0).eval(); // q_ib
+                        (-C_bi*Skew((C_iw.transpose() * v_iw + omega_sk * p_ib))).block<2,3>(0,0).eval(); // q_ib
 
                     // Angular Rate
                     H.block<1,3>(5, kIdxstartcorr_qib) =
                         calibattfix ?
                         Eigen::Matrix<double, 1, 3>::Zero() : 
-                        (omega_sk).block<1,3>(2,0).eval(); // q_ib
+                        (-C_bi*Skew(state.w_m)).block<1,3>(2,0).eval(); // q_ib
 
+                    //MSF_INFO_STREAM("p_iw:" << p_iw.transpose() << " v_iw:" << v_iw.transpose() << " q_iw:" << STREAMQUAT(q_iw));
+                    //MSF_INFO_STREAM("p_ib:" << p_ib.transpose() << " q_ib:" << STREAMQUAT(q_ib));
+                    //MSF_INFO_STREAM("p_d:" << p_d.transpose() << " yaw_d:" << yaw_d);
+                    //MSF_INFO_STREAM("H[:,0:9]:\n" << H.leftCols(9));
+                    //MSF_INFO_STREAM("H[:,9:28]:\n" << H.middleCols<19>(9));
+                    //MSF_INFO_STREAM("H[:,28:37]:\n" << H.middleCols<9>(28));
                 }
 
                 /**
@@ -270,45 +360,65 @@ namespace msf_updates {
 
                         CalculateH(state_nonconst_new, H_new);
 
-                        // Get rotation matrices.
-                        Eigen::Matrix<double, 3, 3> C_wo = state.Get<StateDefinition_T::q_wo>()
-                            .conjugate().toRotationMatrix();
+                        Eigen::Matrix<double, 3, 1> p_iw = state.Get<StateDefinition_T::p>();
+                        Eigen::Matrix<double, 3, 1> v_iw = state.Get<StateDefinition_T::v>();
 
-                        Eigen::Matrix<double, 3, 3> C_q = state.Get<StateDefinition_T::q>()
-                            .conjugate().toRotationMatrix();
+                        Eigen::Quaterniond q_ib = state.Get<StateDefinition_T::q_ib>();
+
+                        Eigen::Quaterniond q_iw = state.Get<StateDefinition_T::q>();
+                        // decompose to yaw about z
+                        Eigen::Quaterniond q_bw = q_iw*q_ib;
+                        Eigen::Quaterniond q_bw_y = Eigen::Quaterniond(q_bw.w(), 0, 0, q_bw.z()).normalized();
+                        // and pitch/roll about vector in xy plane
+                        Eigen::Quaterniond q_bw_pr = q_bw*q_bw_y.conjugate();
+
+                        Eigen::Matrix<double, 3, 1> p_ib = state.Get<StateDefinition_T::p_ib>();
+
+                        double yaw_d = state.Get<StateDefinition_T::yaw_d>()(0);
+                        Eigen::Quaterniond q_d = Eigen::Quaterniond(sqrt(1.0-yaw_d*yaw_d/4.0), 0, 0, yaw_d/2.0);
+                        // construct odometry->world rotation
+                        Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
+
+                        Eigen::Matrix<double, 2, 1> p_d = state.Get<StateDefinition_T::p_d>();
 
                         // Construct residuals.
                         // Position.
                         r_old.block<2, 1>(0, 0) = z_p_.block<2,1>(0,0)
-                                - ((C_wo.transpose()
-                                    * (-state.Get<StateDefinition_T::p_wo>()
-                                        + state.Get<StateDefinition_T::p>()
-                                        + C_q.transpose() * state.Get<StateDefinition_T::p_ib>()))).block<2,1>(0,0);
+                                - ((q_wo*(p_iw + q_iw*p_ib)).block<2,1>(0,0) + p_d);
+
+                        //MSF_INFO_STREAM("position measured: " << (z_p_.block<2,1>(0,0).transpose()));
+                        //MSF_INFO_STREAM("        predicted: " << (((q_wo*(p_iw + q_iw*p_ib)).block<2,1>(0,0) + p_d).transpose()));
 
                         // Yaw.
                         Eigen::Quaternion<double> q_err;
-                        Eigen::Quaternion<double> z_q(cos(z_p_(2)/2.0), 0.0, 0.0, sin(z_p_(2)/2.0));
-                        q_err = (state.Get<StateDefinition_T::q_wo>()
-                                * state.Get<StateDefinition_T::q>()
-                                * state.Get<StateDefinition_T::q_ib>()).conjugate() * z_q;
-                        r_old.block<1, 1>(2, 0) = (q_err.vec() / q_err.w() * 2).block<1,1>(2,0);
+                        Eigen::Quaternion<double> z_q(sqrt(1.0-z_p_(2)*z_p_(2)), 0.0, 0.0, z_p_(2));
+                        q_err = (q_wo * q_iw * q_ib).conjugate() * z_q;
                         // Odometry world yaw drift - virtual measurement to fix yaw to this world
-                        // q_err = state.Get<StateQwoIdx>();
+                        // q_err = q_d;
+                        r_old.block<1, 1>(2, 0) = (q_err.vec() / q_err.w() * 2).block<1,1>(2,0);
+
+                        //MSF_INFO_STREAM("yaw measured: " << STREAMQUAT(z_q));
+                        //MSF_INFO_STREAM("   predicted: " << STREAMQUAT((q_wo * q_iw * q_ib)));
 
                         // r_old(6, 0) = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y())
                         //     / (1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z()));
 
                         // velocity
                         r_old.block<2,1>(3,0) = z_p_.block<2,1>(3,0) -
-                            (state.Get<StateDefinition_T::q_ib>().conjugate()
-                                * state.Get<StateDefinition_T::q>()
-                                * state.Get<StateDefinition_T::v>() +
-                             state.Get<StateDefinition_T::q_ib>().conjugate()*(omega_sk*state.Get<StateDefinition_T::p_ib>())).block<2,1>(0,0);
+                            (q_ib.conjugate()*(q_iw.conjugate() * v_iw + omega_sk*p_ib)).block<2,1>(0,0);
+
+                        //MSF_INFO_STREAM("velocity measured: " << (z_p_.block<2,1>(3,0).transpose()));
+                        //MSF_INFO_STREAM("        predicted: " <<
+                        //    ((q_ib.conjugate()*(q_iw.conjugate() * v_iw + omega_sk*p_ib)).block<2,1>(0,0).transpose())
+                        //    );
 
                         // angular rate z
-                        r_old.block<1,1>(5,0) = z_p_.block<1,1>(5,0) -
-                            (state.Get<StateDefinition_T::q_ib>().conjugate()
-                             *state.w_m).block<1,1>(2,0);
+                        r_old.block<1,1>(5,0) = z_p_.block<1,1>(5,0) - (q_ib.conjugate()*state.w_m).block<1,1>(2,0);
+
+                        //MSF_INFO_STREAM("angular rate measured: " << (z_p_.block<1,1>(5,0)));
+                        //MSF_INFO_STREAM("            predicted: " << ((q_ib.conjugate()*state.w_m).block<1,1>(2,0)));
+
+                        //MSF_INFO_STREAM("r_old: " << r_old.transpose());
 
                         if (!CheckForNumeric(r_old, "r_old")) {
                             MSF_ERROR_STREAM("r_old: "<<r_old);
@@ -376,51 +486,91 @@ namespace msf_updates {
 
                         CalculateH(state_nonconst_new, H_new);
 
+                        Eigen::Matrix<double, 3, 3> omega_sk_new = Skew(state_new.w_m);
+                        Eigen::Matrix<double, 3, 3> omega_sk_old = Skew(state_old.w_m);
+
                         //TODO (slynen): check that both measurements have the same states fixed!
-                        Eigen::Matrix<double, 3, 3> C_wo_old, C_wo_new;
-                        Eigen::Matrix<double, 3, 3> C_q_old, C_q_new;
+                        Eigen::Matrix<double, 3, 1> p_iw_old = state_old.Get<StateDefinition_T::p>();
+                        Eigen::Matrix<double, 3, 1> v_iw_old = state_old.Get<StateDefinition_T::v>();
 
-                        C_wo_new = state_new.Get<StateDefinition_T::q_wo>().conjugate().toRotationMatrix();
-                        C_q_new = state_new.Get<StateDefinition_T::q>().conjugate()
-                            .toRotationMatrix();
+                        Eigen::Quaterniond q_iw_old = state_old.Get<StateDefinition_T::q>();
 
-                        C_wo_old = state_old.Get<StateDefinition_T::q_wo>().conjugate().toRotationMatrix();
-                        C_q_old = state_old.Get<StateDefinition_T::q>().conjugate()
-                            .toRotationMatrix();
+                        Eigen::Matrix<double, 3, 1> p_ib_old = state_old.Get<StateDefinition_T::p_ib>();
+
+                        Eigen::Quaterniond q_ib_old = state_old.Get<StateDefinition_T::q_ib>();
+
+                        double yaw_d_old = state_old.Get<StateDefinition_T::yaw_d>()(0);
+                        Eigen::Quaterniond q_d_old = Eigen::Quaterniond(sqrt(1.0-yaw_d_old*yaw_d_old/4.0), 0, 0, yaw_d_old/2.0);
+
+                        Eigen::Matrix<double, 2, 1> p_d_old = state_old.Get<StateDefinition_T::p_d>();
+
+                        // decompose to yaw about z
+                        Eigen::Quaterniond q_bw_old = q_iw_old*q_ib_old;
+                        Eigen::Quaterniond q_bw_y_old = Eigen::Quaterniond(q_bw_old.w(), 0, 0, q_bw_old.z()).normalized();
+                        // and pitch/roll about vector in xy plane
+                        Eigen::Quaterniond q_bw_pr_old = q_bw_old*q_bw_y_old.conjugate();
+
+                        // construct odometry->world rotation
+                        Eigen::Quaterniond q_wo_old = (q_bw_pr_old*q_d_old).conjugate();
+
+
+                        Eigen::Matrix<double, 3, 1> p_iw_new = state_new.Get<StateDefinition_T::p>();
+                        Eigen::Matrix<double, 3, 1> v_iw_new = state_new.Get<StateDefinition_T::v>();
+
+                        Eigen::Quaterniond q_iw_new = state_new.Get<StateDefinition_T::q>();
+
+                        Eigen::Matrix<double, 3, 1> p_ib_new = state_new.Get<StateDefinition_T::p_ib>();
+
+                        Eigen::Quaterniond q_ib_new = state_new.Get<StateDefinition_T::q_ib>();
+
+                        double yaw_d_new = state_new.Get<StateDefinition_T::yaw_d>()(0);
+                        Eigen::Quaterniond q_d_new = Eigen::Quaterniond(sqrt(1.0-yaw_d_new*yaw_d_new/4.0), 0, 0, yaw_d_new/2.0);
+
+                        Eigen::Matrix<double, 2, 1> p_d_new = state_new.Get<StateDefinition_T::p_d>();
+
+                        // decompose to yaw about z
+                        Eigen::Quaterniond q_bw_new = q_iw_new*q_ib_new;
+                        Eigen::Quaterniond q_bw_y_new = Eigen::Quaterniond(q_bw_new.w(), 0, 0, q_bw_new.z()).normalized();
+                        // and pitch/roll about vector in xy plane
+                        Eigen::Quaterniond q_bw_pr_new = q_bw_new*q_bw_y_new.conjugate();
+
+                        // construct odometry->world rotation
+                        Eigen::Quaterniond q_wo_new = (q_bw_pr_new*q_d_new).conjugate();
 
                         // Construct residuals.
                         // Position:
-                        Eigen::Matrix<double, 2, 1> diffprobpos = ((C_wo_new.transpose()
-                                    * (-state_new.Get<StateDefinition_T::p_wo>() + state_new.Get<StateDefinition_T::p>()
-                                        + C_q_new.transpose() * state_new.Get<StateDefinition_T::p_ib>()))
-                                - (C_wo_old.transpose()
-                                    * (-state_old.Get<StateDefinition_T::p_wo>() + state_old.Get<StateDefinition_T::p>()
-                                        + C_q_old.transpose() * state_old.Get<StateDefinition_T::p_ib>()))).block<2,1>(0,0);
-
+                        Eigen::Matrix<double, 2, 1> diffprobpos =
+                            ((q_wo_new*(p_iw_new + q_iw_new*p_ib_new)).block<2,1>(0,0) + p_d_new)
+                           -((q_wo_old*(p_iw_old + q_iw_old*p_ib_old)).block<2,1>(0,0) + p_d_old);
 
                         Eigen::Matrix<double, 2, 1> diffmeaspos =
                             z_p_.block<2,1>(0,0) - prevmeas->z_p_.block<2,1>(0,0);
 
                         r_new.block<2, 1>(0, 0) = diffmeaspos - diffprobpos;
 
-                        // Attitude:
-                        Eigen::Quaternion<double> diffprobatt = (state_new.Get<StateDefinition_T::q_wo>()
-                                * state_new.Get<StateDefinition_T::q>()
-                                * state_new.Get<StateDefinition_T::q_ib>()).conjugate()
-                            * (state_old.Get<StateDefinition_T::q_wo>()
-                                    * state_old.Get<StateDefinition_T::q>()
-                                    * state_old.Get<StateDefinition_T::q_ib>());
+                        // Yaw:
+                        Eigen::Quaternion<double> diffprobatt =
+                            (q_wo_new * q_iw_new * q_ib_new).conjugate() *
+                            (q_wo_old * q_iw_old * q_ib_old);
 
-                        double diffmeasatt = z_p_(2,0) - prevmeas->z_p_(2,0);
+                        Eigen::Quaterniond z_q_(sqrt(1.0-z_p_(2,0)*z_p_(2,0)), 0, 0, z_p_(2,0));
+                        Eigen::Quaterniond z_q_prev(sqrt(1.0-prevmeas->z_p_(2,0)*prevmeas->z_p_(2,0)), 0, 0, prevmeas->z_p_(2,0));
+                        Eigen::Quaterniond diffmeasatt = z_q_.conjugate() * z_q_prev;
+                        Eigen::Quaterniond qerr = diffprobatt.conjugate() * diffmeasatt;
+                        r_new(2,0) = qerr.z()/qerr.w() * 2;
 
-                        double y_err = diffmeasatt - diffprobatt.z()/diffprobatt.w()*2;
+                        // Velocity:
+                        Eigen::Matrix<double, 2, 1> diffprobvel =
+                            (q_ib_new.conjugate() * (q_iw_new.conjugate() * v_iw_new + omega_sk_new*p_ib_new)).block<2,1>(0,0)
+                           -(q_ib_old.conjugate() * (q_iw_old.conjugate() * v_iw_old + omega_sk_old*p_ib_old)).block<2,1>(0,0);
 
-                        r_new(3, 0) = y_err;
-                        // Odometry world yaw drift.
-                        //q_err = state_new.Get<StateQwvIdx>();
+                        Eigen::Matrix<double, 2, 1> diffmeasvel = z_p_.block<2,1>(3,0) - prevmeas->z_p_.block<2,1>(3,0);
+                        r_new.block<2,1>(3,0) = diffmeasvel - diffprobvel;
 
-                        //r_new(6, 0) = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y())
-                        //    / (1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z()));
+                        // angular rate
+                        Eigen::Matrix<double, 1, 1> diffprobomega = (q_ib_new.conjugate()*state_new.w_m - q_ib_old.conjugate()*state_old.w_m).block<1,1>(2,0);
+                        Eigen::Matrix<double, 1, 1> diffmeasomega = z_p_.block<1,1>(5,0) - prevmeas->z_p_.block<1,1>(5,0);
+                        r_old.block<1,1>(5,0) = diffmeasomega - diffprobomega;
 
                         if (!CheckForNumeric(r_old, "r_old")) {
                             MSF_ERROR_STREAM("r_old: "<<r_old);
