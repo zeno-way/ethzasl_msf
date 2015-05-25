@@ -293,20 +293,15 @@ struct PoseMeasurement : public PoseMeasurementBase {
       CalculateH(state_nonconst_new, H_new);
 
       // Get rotation matrices.
-      Eigen::Matrix<double, 3, 3> C_wv = state.Get<StateQwvIdx>()
+      Eigen::Matrix<double, 3, 3> C_wv = state.Get<StateQwvIdx>().toRotationMatrix();
 
-          .conjugate().toRotationMatrix();
-      Eigen::Matrix<double, 3, 3> C_q = state.Get<StateDefinition_T::q>()
-          .conjugate().toRotationMatrix();
+      Eigen::Matrix<double, 3, 3> C_q = state.Get<StateDefinition_T::q>().toRotationMatrix();
 
       // Construct residuals.
       // Position.
       r_old.block<3, 1>(0, 0) = z_p_
-          - (C_wv.transpose()
-              * (-state.Get<StatePwvIdx>()
-                  + state.Get<StateDefinition_T::p>()
-                  + C_q.transpose() * state.Get<StatePicIdx>()))
-              * state.Get<StateLIdx>();
+          - (C_wv * (-state.Get<StatePwvIdx>() + state.Get<StateDefinition_T::p>()
+                  + C_q * state.Get<StatePicIdx>())) * state.Get<StateLIdx>();
 
       // Attitude.
       Eigen::Quaternion<double> q_err;
