@@ -25,7 +25,7 @@ template<typename EKFState_T>
 class IMUHandler_ROS : public IMUHandler<EKFState_T> {
   ros::Subscriber subState_;  ///< subscriber to external state propagation
   ros::Subscriber subImu_;  ///< subscriber to IMU readings
-  ros::Subscriber subImuCustom_;  ///< subscriber to IMU readings for asctec custom
+  //ros::Subscriber subImuCustom_;  ///< subscriber to IMU readings for asctec custom
 
   bool accel_units_g_;
  public:
@@ -41,8 +41,10 @@ class IMUHandler_ROS : public IMUHandler<EKFState_T> {
 
     subImu_ = nh.subscribe("imu_state_input", 100, &IMUHandler_ROS::IMUCallback,
                            this);
+    /*
     subImuCustom_ = nh.subscribe("imu_state_input_asctec", 10,
                                  &IMUHandler_ROS::IMUCallbackAsctec, this);
+    */
     subState_ = nh.subscribe("hl_state_input", 10,
                              &IMUHandler_ROS::StateCallback, this);
   }
@@ -95,6 +97,7 @@ class IMUHandler_ROS : public IMUHandler<EKFState_T> {
                         msg->header.stamp.toSec(), msg->header.seq);
   }
 
+  /*
   void IMUCallbackAsctec(const asctec_hl_comm::mav_imuConstPtr & msg) {
     msf_core::Vector3 linacc;
     linacc << msg->acceleration.x, msg->acceleration.y, msg->acceleration.z;
@@ -106,6 +109,7 @@ class IMUHandler_ROS : public IMUHandler<EKFState_T> {
     this->ProcessIMU(linacc, angvel, msg->header.stamp.toSec(),
                       msg->header.seq);
   }
+  */
 
   void IMUCallback(const sensor_msgs::ImuConstPtr & msg) {
     static int lastseq = constants::INVALID_SEQUENCE;
