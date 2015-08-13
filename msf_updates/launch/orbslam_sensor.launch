@@ -1,0 +1,13 @@
+<launch>
+
+    <node  name="orbslam_pose_sensor" pkg="msf_updates" type="pose_sensor" clear_params="true" output="screen"> 
+
+        <remap from="msf_core/imu_state_input" to="quadcloud2/kmel_kquad_interface/imu" />
+        <remap from="msf_updates/transform_input" to="ORB_SLAM/camera_pose" />
+
+        <rosparam file="$(find msf_updates)/orbslam_sensor_fix.yaml"/>
+    </node>
+
+    <node pkg="rosservice" type="rosservice" name="initialize" args="call --wait /orbslam_pose_sensor/pose_sensor/initialize_msf_scale 1"/>
+
+</launch>
