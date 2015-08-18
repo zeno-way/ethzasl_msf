@@ -2,8 +2,8 @@
 
     <node  name="orbslam_pose_sensor" pkg="msf_updates" type="pose_sensor" clear_params="true" output="screen"> 
 
-        <remap from="msf_core/imu_state_input" to="/quadcloud2/kmel_kquad_interface/imu" />
-        <remap from="msf_updates/transform_input" to="/camera_pose" />
+        <remap from="msf_core/imu_state_input" to="/downsampled_imu" />
+        <remap from="msf_updates/pose_input" to="/ORB_SLAM/camera_pose" />
 
         <rosparam file="$(find msf_updates)/orbslam_sensor_fix.yaml"/>
     </node>

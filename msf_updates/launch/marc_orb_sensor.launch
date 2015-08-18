@@ -1,0 +1,11 @@
+<launch>
+
+    <node  name="marc_orb_pose_sensor" pkg="msf_updates" type="pose_sensor" clear_params="true" output="screen"> 
+
+        <remap from="msf_core/imu_state_input" to="/mavros/imu/data" />
+        <remap from="msf_updates/pose_input" to="/ORB_SLAM/pose" />
+
+        <rosparam file="$(find msf_updates)/marc_orb_sensor_fix.yaml"/>
+    </node>
+
+</launch>
