@@ -1,5 +1,6 @@
 build
 CMakeCache.txt
+CMakeLists.txt.user
 msg_gen
 /bin
 /lib
