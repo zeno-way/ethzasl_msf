@@ -45,6 +45,6 @@ endif()
 add_executable(test_distort src/test/test_distort.cc)
 target_link_libraries(test_distort pose_distorter)
 
-# As a workaround for QtCreator to show the header files in Project View, add them to a new custom target.
-FILE(GLOB_RECURSE _QTCREATOR_INCLUDE_FILES "*.h" "*.hpp")
+# As a workaround for QtCreator to show all files in Project View, add them to a new custom target.
+FILE(GLOB_RECURSE _QTCREATOR_INCLUDE_FILES "*.*")
 add_custom_target(_qtcreator_include_files_fix_target SOURCES ${_QTCREATOR_INCLUDE_FILES})

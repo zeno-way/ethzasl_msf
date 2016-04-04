@@ -63,6 +63,7 @@ target_link_libraries(test_similaritytransform similaritytransform)
 catkin_add_gtest(test_static_statelist src/test/test_staticstatelist.cc)
 target_link_libraries(test_static_statelist pthread ${PROJECT_NAME})
 
-# As a workaround for QtCreator to show the header files in Project View, add them to a new custom target.
-FILE(GLOB_RECURSE _QTCREATOR_INCLUDE_FILES "*.h" "*.hpp")
+
+# As a workaround for QtCreator to show all files in Project View, add them to a new custom target.
+FILE(GLOB_RECURSE _QTCREATOR_INCLUDE_FILES "*.*")
 add_custom_target(_qtcreator_include_files_fix_target SOURCES ${_QTCREATOR_INCLUDE_FILES})
